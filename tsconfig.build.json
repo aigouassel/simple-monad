@@ -1,0 +1,10 @@
+{
+  // Publishable build: emits only the library (tests excluded) plus the .d.ts
+  // declarations that consumers of the npm package rely on for types.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "declaration": true
+  },
+  "exclude": ["src/tests/**/*.ts"]
+}

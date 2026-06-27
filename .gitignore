@@ -1,0 +1,27 @@
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# Whether you use PnP or not, the node_modules folder is often used to store
+# build artifacts that should be gitignored
+node_modules
+
+# Standard install: the dependency cache and PnP files are NOT committed.
+# yarn.lock is the source of truth for reproducible installs.
+# Zero-install docs (not used here): https://yarnpkg.com/features/caching#zero-installs
+.pnp.*
+
+# Compiled output
+dist
+
+# editor
+.editorconfig
+.vscode/
+
+# git
+.npmrc
+
+# jest
+coverage/

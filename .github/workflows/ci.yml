@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          # Cache Yarn's global cache between runs to speed up installs.
+          cache: yarn
+
+      # Corepack ships with Node and pins Yarn to the version in package.json
+      # ("packageManager"), so no separate Yarn install is needed.
+      - name: Enable Corepack
+        run: corepack enable
+
+      # --immutable fails if installing would change yarn.lock, guaranteeing
+      # the committed lockfile is complete and in sync with package.json.
+      - name: Install
+        run: yarn install --immutable
+
+      - name: Lint & format check
+        run: yarn lint
+
+      - name: Build
+        run: yarn build
+
+      - name: Test
+        run: yarn test

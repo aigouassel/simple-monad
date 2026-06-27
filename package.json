@@ -1,0 +1,59 @@
+{
+  "name": "simple-monad",
+  "version": "1.0.0",
+  "description": "A tiny, dependency-free Result (Ok/Bad) type for TypeScript.",
+  "license": "MIT",
+  "author": {
+    "url": "https://github.com/aigouassel",
+    "name": "Audrey Igouassel"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aigouassel/simple-monad.git"
+  },
+  "homepage": "https://github.com/aigouassel/simple-monad#readme",
+  "bugs": "https://github.com/aigouassel/simple-monad/issues",
+  "keywords": [
+    "result",
+    "monad",
+    "ok",
+    "either",
+    "error-handling",
+    "type-safe",
+    "typescript"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "packageManager": "yarn@4.17.0",
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "yarn clean && yarn build",
+    "test": "jest",
+    "test:coverage": "jest --coverage",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write ."
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.1",
+    "@types/jest": "30.0.0",
+    "@types/node": "26.0.1",
+    "jest": "30.4.2",
+    "jest-pnp-resolver": "1.2.3",
+    "ts-jest": "29.4.11",
+    "typescript": "6.0.3"
+  }
+}
