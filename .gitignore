@@ -25,3 +25,6 @@ dist
 
 # jest
 coverage/
+
+# typedoc generated API site
+docs/

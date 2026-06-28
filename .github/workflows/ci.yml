@@ -3,7 +3,6 @@ name: CI
 on:
   push:
     branches: [main]
-  pull_request:
 
 jobs:
   check:
@@ -43,3 +42,53 @@ jobs:
 
       - name: Test
         run: yarn test
+
+  deploy-docs:
+    # Publish the TypeDoc API site to GitHub Pages — only on pushes to main
+    # (the workflow already only triggers on main), and only once `check` is
+    # green so we never publish docs that don't build.
+    needs: check
+    runs-on: ubuntu-latest
+    # Scoped to this job only (least privilege): the Pages deploy needs to write
+    # Pages and mint an OIDC token so deploy-pages can prove the artifact came
+    # from this workflow run. The check job keeps the default read-only token.
+    permissions:
+      pages: write
+      id-token: write
+    # One in-flight Pages deploy at a time; never cancel a running publish.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Same Corepack dance as the check job: set up Node, enable Corepack so
+      # `yarn` resolves to v4, then re-run setup-node to wire up the Yarn cache.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Enable Corepack
+        run: corepack enable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: yarn
+
+      - name: Install
+        run: yarn install --immutable
+
+      # Emits the static site to ./docs (treatWarningsAsErrors is on, so a
+      # missing doc or broken link fails here rather than publishing silently).
+      - name: Build docs
+        run: yarn docs
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

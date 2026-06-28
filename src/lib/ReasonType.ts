@@ -1,3 +1,6 @@
-// A Bad's `reason` is a string *tag* (a discriminant), not free-form error data.
-// Constraining it to `string` is what lets `Result.matchBad` switch on the reason.
+/**
+ * The type of a {@link Bad}'s `reason` — a string **tag** naming a failure mode
+ * (e.g. `"not_found"`). Tags are the discriminant {@link Result.matchBad}
+ * switches on; the failure *data* lives separately in the `value` payload.
+ */
 export type ReasonType = string;
