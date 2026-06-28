@@ -1,0 +1,20 @@
+{
+  // CommonJS sibling of the publishable ESM build. tsc rewrites the `.js`
+  // import specifiers to `require("./lib/*.js")` and emits CommonJS, so the
+  // `require` / `default` exports conditions resolve for CJS-runtime consumers
+  // (e.g. Jest under ts-jest). A `dist/cjs/package.json` written by `build:cjs`
+  // marks this subtree `"type": "commonjs"`, overriding the root `"type":
+  // "module"` so Node treats these `.js` files as CommonJS.
+  "extends": "./tsconfig.build.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    // `module: commonjs` pairs with classic node resolution. node10 is
+    // deprecated in TS 6 (removed in TS 7); silence the flag until then.
+    "moduleResolution": "node10",
+    "ignoreDeprecations": "6.0",
+    // Declarations ship once, from the ESM build (dist/index.d.ts).
+    "declaration": false,
+    "outDir": "dist/cjs",
+    "tsBuildInfoFile": "./dist/cjs/.tsbuildinfo"
+  }
+}

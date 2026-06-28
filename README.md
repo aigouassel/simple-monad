@@ -113,13 +113,13 @@ leaf guards (`if (leaf.isOk()) …`), which narrow the value on both branches.
 
 ## Compatibility
 
-`simple-monad` is published as **ESM only** (`"type": "module"`): it ships ES modules
-plus `.d.ts` type declarations, with no CommonJS build.
+`simple-monad` ships a **dual build** — native ES modules **and** CommonJS — plus
+`.d.ts` type declarations. As of v3.1.0 it resolves cleanly under both module systems.
 
-- **ESM projects / modern bundlers** — just `import` it, as shown above.
-- **CommonJS consumers** — you can't `require("simple-monad")`. Either load it with a
-  dynamic `import("simple-monad")`, or run a Node version new enough to `require()` ESM
-  (Node ≥ 20.19 / ≥ 22.12).
+- **ESM projects / modern bundlers** — `import` it, as shown above.
+- **CommonJS consumers** — `require("simple-monad")` works; it resolves to the CJS build
+  (this is what unblocks CJS test runners such as Jest via ts-jest).
+- **TypeScript** — one shared set of `.d.ts` serves both; no extra configuration.
 
 ## Why
 
@@ -152,26 +152,26 @@ because the failure type is a union of `Bad` leaves, adding a failure mode is ju
 
 Constructed only via `Result.from(...)` (the constructor is private).
 
-| Member                 | Description                                                                  |
-| ---------------------- | ---------------------------------------------------------------------------- |
-| `Result.from(res)`     | Lift an `Ok` / `Bad` / `OkOrBad` into a `Result` for chaining.               |
-| `.map(f)`              | Transform the success value; a failure passes through unchanged.             |
-| `.match({ ok, bad })`  | Collapse to a single value; `bad` is a per-reason map (like `matchBad`). Each arm is required only when its rail is inhabited. |
-| `.toUnion()`           | Drop back to the `Ok \| Bad` leaf union — the inverse of `Result.from`.      |
+| Member                | Description                                                                                                                    |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `Result.from(res)`    | Lift an `Ok` / `Bad` / `OkOrBad` into a `Result` for chaining.                                                                 |
+| `.map(f)`             | Transform the success value; a failure passes through unchanged.                                                               |
+| `.match({ ok, bad })` | Collapse to a single value; `bad` is a per-reason map (like `matchBad`). Each arm is required only when its rail is inhabited. |
+| `.toUnion()`          | Drop back to the `Ok \| Bad` leaf union — the inverse of `Result.from`.                                                        |
 
 ### `Result` static toolkit
 
 These operate on bare leaves and **throw `ResultError`** when handed the wrong variant.
 
-| Member                             | Description                                                        |
-| ---------------------------------- | ------------------------------------------------------------------ |
-| `Result.unwrap(r)`                 | The `Ok` value — throws on a `Bad`.                                |
-| `Result.unwrapOnlyOk(r)`           | Like `unwrap`, but typed to accept only an `Ok`.                   |
-| `Result.unwrapBad(r)`              | The `Bad` leaf — throws on an `Ok`.                                |
-| `Result.unwrapBadReason(r)`        | The `Bad`'s tag — throws on an `Ok`.                               |
-| `Result.unwrapBadValue(r)`         | The `Bad`'s payload — throws on an `Ok`.                           |
+| Member                             | Description                                                                |
+| ---------------------------------- | -------------------------------------------------------------------------- |
+| `Result.unwrap(r)`                 | The `Ok` value — throws on a `Bad`.                                        |
+| `Result.unwrapOnlyOk(r)`           | Like `unwrap`, but typed to accept only an `Ok`.                           |
+| `Result.unwrapBad(r)`              | The `Bad` leaf — throws on an `Ok`.                                        |
+| `Result.unwrapBadReason(r)`        | The `Bad`'s tag — throws on an `Ok`.                                       |
+| `Result.unwrapBadValue(r)`         | The `Bad`'s payload — throws on an `Ok`.                                   |
 | `Result.matchBad(r, map)`          | Requires a `Bad` (narrow first); dispatch on the tag; throws if unhandled. |
-| `ResultError` / `throwResultError` | The error thrown by the helpers above, and its thrower.            |
+| `ResultError` / `throwResultError` | The error thrown by the helpers above, and its thrower.                    |
 
 ## Development
 
@@ -216,13 +216,13 @@ This repo uses **Yarn 4 with Plug'n'Play** — dependencies live in zip archives
 | `src/lib/types.ts`       | Inlined type utilities (kept in-repo to stay dependency-free). |
 | `src/tests/`             | Jest specs (`Ok-Bad`, `Result`, `Result.helpers`).             |
 
-| Command         | What it does                                                                     |
-| --------------- | -------------------------------------------------------------------------------- |
-| `yarn build`    | Compile the library to `dist/` (ESM + `.d.ts`) via `tsc -p tsconfig.build.json`. |
-| `yarn test`     | Run the [Jest] test suite (via ts-jest).                                         |
-| `yarn lint`     | Check formatting and lint rules with [Biome].                                    |
-| `yarn lint:fix` | Auto-fix lint issues and format.                                                 |
-| `yarn format`   | Format only.                                                                     |
+| Command         | What it does                                                                                             |
+| --------------- | -------------------------------------------------------------------------------------------------------- |
+| `yarn build`    | Compile both builds: ESM to `dist/` (+ `.d.ts`) and CommonJS to `dist/cjs/` (`build:esm` + `build:cjs`). |
+| `yarn test`     | Run the [Jest] test suite (via ts-jest).                                                                 |
+| `yarn lint`     | Check formatting and lint rules with [Biome].                                                            |
+| `yarn lint:fix` | Auto-fix lint issues and format.                                                                         |
+| `yarn format`   | Format only.                                                                                             |
 
 ### Further reading
 
