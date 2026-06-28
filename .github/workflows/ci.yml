@@ -11,16 +11,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # First set up Node so Corepack is available...
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          # Cache Yarn's global cache between runs to speed up installs.
-          cache: yarn
 
-      # Corepack ships with Node and pins Yarn to the version in package.json
-      # ("packageManager"), so no separate Yarn install is needed.
+      # ...then enable Corepack, which pins Yarn to the version in package.json
+      # ("packageManager"). This must run BEFORE any `yarn` invocation — including
+      # setup-node's own cache lookup below — otherwise the runner's preinstalled
+      # Yarn 1.22 runs first and aborts on the `packageManager` mismatch.
       - name: Enable Corepack
         run: corepack enable
+
+      # Re-run setup-node now that `yarn` resolves to v4, so its cache lookup uses
+      # the right Yarn and the global Yarn cache is restored between runs.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: yarn
 
       # --immutable fails if installing would change yarn.lock, guaranteeing
       # the committed lockfile is complete and in sync with package.json.
