@@ -4,26 +4,32 @@ A tiny, dependency-free `Result` type for TypeScript — a value that is either
 `Ok` (success) or `Bad` (failure), so errors live in the type system instead of
 in thrown exceptions.
 
-**Lightweight:** ~4.9 kB packed / ~11.8 kB unpacked, with **zero runtime dependencies**.
+A failure is a string **tag** (`reason`) plus an optional **payload** (`value`):
+`bad("invalid_port", raw)`. The tag is what you switch on; the payload carries the
+data. Successes mirror it — `ok(x)` carries a value, `ok()` is a valueless success.
 
-It comes in two layers:
+**Lightweight:** a handful of small modules, with **zero runtime dependencies**.
+
+It comes in layers:
 
 - **Simple layer** — `ok` / `bad` produce plain tagged-union values you return,
   narrow with `isOk()` / `isBad()`, and read via `.value` / `.reason`.
-- **`Result` layer** — an opt-in wrapper (`Result.from(...)`) you reach for when
-  you want to _chain_ operations (`map`, `match`, `toUnion`).
+- **`Result` wrapper** — an opt-in chaining layer (`Result.from(...)` → `map`,
+  `match`, `toUnion`).
+- **`Result` static toolkit** — `unwrap*` / `matchBad` helpers that work directly
+  on the leaves and **throw** a `ResultError` on the wrong variant.
 
 ## Usage
 
 ### Simple layer — `ok` / `bad` + narrowing
 
 ```ts
-import { ok, bad, type OkOrBad } from "simple-monad";
+import { ok, bad, type Bad, type OkOrBad } from "simple-monad";
 
-function parsePort(raw: string): OkOrBad<number, string> {
+function parsePort(raw: string): OkOrBad<number, Bad<"invalid_port", string>> {
   const n = Number(raw);
   if (!Number.isInteger(n) || n < 1 || n > 65535) {
-    return bad(`invalid port: ${raw}`);
+    return bad("invalid_port", raw); // tag + payload
   }
   return ok(n);
 }
@@ -33,15 +39,47 @@ if (r.isOk()) {
   // narrowed to Ok<number>, so `.value` is safe
   console.log(r.value);
 } else {
-  // narrowed to Bad<string>, so `.reason` is safe
-  console.error(r.reason);
+  // narrowed to Bad<"invalid_port", string>
+  console.error(r.reason, r.value); // "invalid_port", the raw input
 }
 ```
 
-### `Result` layer — chaining
+### Multiple failure modes
 
-Lift a `OkOrBad` (or a bare `ok` / `bad`) with `Result.from(...)` when you want
-to transform or fold it:
+Because the second type argument is the **union of `Bad` leaves**, each tag stays
+bound to its own payload — narrowing on `.reason` reveals the right `.value`:
+
+```ts
+function checkout(book: Book) {
+  if (!inStock(book)) return bad("book_not_found", { isbn: book.isbn });
+  if (book.price <= 0) return bad("invalid_price", { price: book.price });
+  return ok(book.price);
+}
+// inferred:
+//   Ok<number>
+//   | Bad<"book_not_found", { isbn: string }>
+//   | Bad<"invalid_price", { price: number }>
+```
+
+### Static toolkit — `matchBad` / `unwrap`
+
+`matchBad` dispatches on the tag (and throws `ResultError` if a tag is unhandled);
+`unwrap` pulls the success value out or throws on a failure:
+
+```ts
+import { Result } from "simple-monad";
+
+const message = Result.matchBad(checkout(book), {
+  book_not_found: (b) => `no such book: ${b.value.isbn}`, // b.value: { isbn: string }
+  invalid_price: (b) => `bad price: ${b.value.price}`, // b.value: { price: number }
+});
+
+const port = Result.unwrap(parsePort("8080")); // number — or throws ResultError on a Bad
+```
+
+### `Result` wrapper — chaining
+
+Lift a leaf (or `OkOrBad`) with `Result.from(...)` when you want to transform or fold it:
 
 ```ts
 import { Result } from "simple-monad";
@@ -50,7 +88,7 @@ const label = Result.from(parsePort("8080"))
   .map((p) => p * 2) // transform the success value; a failure passes through
   .match({
     ok: (p) => `port ${p}`, // p: number
-    bad: (e) => `error: ${e}`, // e: string
+    bad: (b) => `error: ${b.reason}`, // b: the whole Bad — read .reason / .value
   });
 ```
 
@@ -67,12 +105,14 @@ plus `.d.ts` type declarations, with no CommonJS build.
 ## Why
 
 Throwing is invisible in a function's signature — the caller has no way to know
-what might go wrong. Returning a `OkOrBad<T, E>` makes the failure case part of
+what might go wrong. Returning an `OkOrBad<T, …>` makes the failure case part of
 the type, so the compiler forces you to handle it.
 
 The `isOk()` / `isBad()` guards are TypeScript [type predicates], so a single `if`
 narrows the union to the correct branch and unlocks `.value` or `.reason` with no
-casts.
+casts. Modelling `reason` as a **string tag** lets `matchBad` switch on it, and
+because the failure type is a union of `Bad` leaves, adding a failure mode is just
+`| Bad<"new_tag", NewValue>` — each handler sees the payload paired with its tag.
 
 [type predicates]: https://www.typescriptlang.org/docs/handbook/2/narrowing.html#using-type-predicates
 
@@ -80,25 +120,40 @@ casts.
 
 ### Simple layer
 
-| Export                 | Description                                                        |
-| ---------------------- | ------------------------------------------------------------------ |
-| `ok(value)`            | Construct a success leaf, `Ok<T>`.                                 |
-| `bad(reason)`          | Construct a failure leaf, `Bad<E>`.                                |
-| `Ok<T>` / `Bad<E>`     | Leaf classes — `.value` / `.reason` plus a `success` discriminant. |
-| `OkOrBad<O, B>`        | `Ok<O> \| Bad<B>` — the type a function returns.                   |
-| `.isOk()` / `.isBad()` | Type-narrowing guards (one `if` unlocks `.value` / `.reason`).     |
+| Export                         | Description                                                             |
+| ------------------------------ | ----------------------------------------------------------------------- |
+| `ok()` / `ok(value)`           | Success leaf — `Ok<void>` / `Ok<T>`.                                    |
+| `bad(tag)` / `bad(tag, value)` | Failure leaf — `Bad<R>` / `Bad<R, V>` (string tag + payload).           |
+| `Ok<T>` / `Bad<R, V>`          | Leaf classes — `.value`, `.reason` (Bad), and a `success` discriminant. |
+| `OkOrBad<O, B>`                | `Ok<O> \| B`, where `B` is the union of `Bad` leaves — the return type. |
+| `ReasonType`                   | The tag type (`string`).                                                |
+| `.isOk()` / `.isBad()`         | Type-narrowing guards (one `if` unlocks `.value` / `.reason`).          |
 
-### `Result` layer
+### `Result` wrapper
 
 Constructed only via `Result.from(...)` (the constructor is private).
 
-| Member                 | Description                                                               |
-| ---------------------- | ------------------------------------------------------------------------- |
-| `Result.from(res)`     | Lift an `Ok` / `Bad` / `OkOrBad` into a `Result` for chaining.            |
-| `.map(f)`              | Transform the success value; a failure passes through unchanged.          |
-| `.match({ ok, bad })`  | Collapse to a single value by handling both arms.                         |
-| `.toUnion()`           | Return the value or the reason (`A \| B`); types as `A` after `isOk()`.   |
-| `.isOk()` / `.isBad()` | Narrow the _opposite_ rail to `never` (`isOk()` ⇒ error type is `never`). |
+| Member                 | Description                                                                  |
+| ---------------------- | ---------------------------------------------------------------------------- |
+| `Result.from(res)`     | Lift an `Ok` / `Bad` / `OkOrBad` into a `Result` for chaining.               |
+| `.map(f)`              | Transform the success value; a failure passes through unchanged.             |
+| `.match({ ok, bad })`  | Collapse to a single value; `bad` receives the whole `Bad` (read tag/value). |
+| `.toUnion()`           | Drop back to the `Ok \| Bad` leaf union — the inverse of `Result.from`.      |
+| `.isOk()` / `.isBad()` | Narrow the _opposite_ rail to `never` (`isOk()` ⇒ failure type is `never`).  |
+
+### `Result` static toolkit
+
+These operate on bare leaves and **throw `ResultError`** when handed the wrong variant.
+
+| Member                             | Description                                                        |
+| ---------------------------------- | ------------------------------------------------------------------ |
+| `Result.unwrap(r)`                 | The `Ok` value — throws on a `Bad`.                                |
+| `Result.unwrapOnlyOk(r)`           | Like `unwrap`, but typed to accept only an `Ok`.                   |
+| `Result.unwrapBad(r)`              | The `Bad` leaf — throws on an `Ok`.                                |
+| `Result.unwrapBadReason(r)`        | The `Bad`'s tag — throws on an `Ok`.                               |
+| `Result.unwrapBadValue(r)`         | The `Bad`'s payload — throws on an `Ok`.                           |
+| `Result.matchBad(r, map)`          | Dispatch on the tag; throws if unhandled; `undefined` for an `Ok`. |
+| `ResultError` / `throwResultError` | The error thrown by the helpers above, and its thrower.            |
 
 ## Development
 
@@ -131,13 +186,17 @@ This repo uses **Yarn 4 with Plug'n'Play** — dependencies live in zip archives
 
 ### Project layout
 
-| Path                | What it holds                                             |
-| ------------------- | --------------------------------------------------------- |
-| `src/index.ts`      | Public barrel — re-exports the simple layer and `Result`. |
-| `src/lib/Ok.ts`     | `Ok` leaf + `ok()`.                                       |
-| `src/lib/Bad.ts`    | `Bad` leaf + `bad()`.                                     |
-| `src/lib/Result.ts` | `OkOrBad` and the `Result` wrapper.                       |
-| `src/tests/`        | Jest specs (`Ok-Bad.test.ts`, `Result.test.ts`).          |
+| Path                     | What it holds                                                  |
+| ------------------------ | -------------------------------------------------------------- |
+| `src/index.ts`           | Public barrel — re-exports every layer.                        |
+| `src/lib/Ok.ts`          | `Ok` leaf + `ok()`.                                            |
+| `src/lib/Bad.ts`         | `Bad` leaf + `bad()`.                                          |
+| `src/lib/Result.ts`      | `OkOrBad`, the `Result` wrapper, and the static toolkit.       |
+| `src/lib/ResultError.ts` | `ResultError` + `throwResultError`.                            |
+| `src/lib/ReasonType.ts`  | `ReasonType` — the failure tag type.                           |
+| `src/lib/AnyResult.ts`   | `AnyResult` — the widest leaf shape, for the helpers.          |
+| `src/lib/types.ts`       | Inlined type utilities (kept in-repo to stay dependency-free). |
+| `src/tests/`             | Jest specs (`Ok-Bad`, `Result`, `Result.helpers`).             |
 
 | Command         | What it does                                                                     |
 | --------------- | -------------------------------------------------------------------------------- |

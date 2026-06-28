@@ -1,39 +1,55 @@
-import { bad, type OkOrBad, ok } from "../index.js";
+import { bad, ok } from "../index.js";
 
-describe("Ok and Bad", () => {
-  it("ok() produces an Ok that narrows to .value", () => {
-    const r: OkOrBad<number, never> = ok(42);
+describe("ok", () => {
+  it("ok(value) is a success carrying the value", () => {
+    const r = ok(42);
+    expect(r.success).toBe(true);
     expect(r.isOk()).toBe(true);
     expect(r.isBad()).toBe(false);
-    if (r.isOk()) {
-      expect(r.value).toBe(42);
-    }
+    expect(r.value).toBe(42);
   });
 
-  it("bad() produces a Bad that narrows to .reason", () => {
-    const r: OkOrBad<never, string> = bad("nope");
+  it("ok() is a valueless (void) success", () => {
+    const r = ok();
+    expect(r.success).toBe(true);
+    expect(r.isOk()).toBe(true);
+    expect(r.value).toBeUndefined();
+  });
+});
+
+describe("bad", () => {
+  it("bad(tag) is a failure carrying the tag as reason, with no value", () => {
+    const r = bad("NOT_FOUND");
+    expect(r.success).toBe(false);
     expect(r.isBad()).toBe(true);
-    if (r.isBad()) {
-      expect(r.reason).toBe("nope");
-    }
+    expect(r.isOk()).toBe(false);
+    expect(r.reason).toBe("NOT_FOUND");
+    expect(r.value).toBeUndefined();
   });
 
-  it("narrows a OkOrBad returned from a function (the everyday simple-layer flow)", () => {
-    function parse(s: string): OkOrBad<number, string> {
+  it("bad(tag, value) attaches a payload alongside the tag", () => {
+    const r = bad("PARSE_FAILED", 3712);
+    expect(r.reason).toBe("PARSE_FAILED");
+    expect(r.value).toBe(3712);
+  });
+
+  it("narrows an Ok | Bad union returned from a function", () => {
+    function parse(s: string) {
       const n = Number(s);
-      return Number.isNaN(n) ? bad("NaN") : ok(n);
+      return Number.isNaN(n) ? bad("NaN", s) : ok(n);
     }
 
     const good = parse("42");
-    expect(good.isOk()).toBe(true);
-    if (good.isOk()) {
-      expect(good.value).toBe(42); // narrowed to Ok<number>
+    if (!good.isOk()) {
+      throw new Error("expected ok");
     }
+    expect(good.value).toBe(42); // narrowed to Ok<number>
 
     const oops = parse("x");
-    expect(oops.isBad()).toBe(true);
-    if (oops.isBad()) {
-      expect(oops.reason).toBe("NaN"); // narrowed to Bad<string>
+    if (!oops.isBad()) {
+      throw new Error("expected bad");
     }
+    expect(oops.reason).toBe("NaN"); // narrowed to Bad<"NaN", string>
+    expect(oops.value).toBe("x");
   });
 });
