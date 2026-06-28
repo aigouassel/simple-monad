@@ -4,6 +4,30 @@ All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.1.0] - 2026-06-28
+
+This release makes the package consumable from **CommonJS runtimes** without changing
+any API. Previously the `exports` map exposed only an `import` condition, so resolvers
+running under CJS — notably Jest via ts-jest, whose resolver requests `require` /
+`default` — could not find an entry and failed with `Cannot find module 'simple-monad'`
+before any code loaded. The package now ships a real dual ESM + CJS build.
+
+### Added
+
+- **Dual ESM + CJS build.** Alongside the existing ESM output (`dist/`), a CommonJS
+  build is emitted to `dist/cjs/` (with a `dist/cjs/package.json` marking that subtree
+  `"type": "commonjs"`). The `exports` map now offers `require` and `default` conditions
+  pointing at the CJS entry, in addition to `import` and `types`. `main` points at the
+  CJS entry for legacy resolvers; `module` points at the ESM entry.
+
+### Notes
+
+- **No API or type changes** — `import` consumers resolve exactly as before.
+- **Dual-package caveat:** narrowing (`isOk` / `isBad`, `match`, `matchBad`) keys off the
+  `success` discriminant, not `instanceof`, so it is unaffected by mixing `import` and
+  `require`. The only cross-boundary risk is consumer-side `instanceof ResultError` /
+  `instanceof Result` when both the ESM and CJS copies are loaded in one process.
+
 ## [3.0.0] - 2026-06-28
 
 This release tightens the **`Result` wrapper** and the **`matchBad`** toolkit so the
