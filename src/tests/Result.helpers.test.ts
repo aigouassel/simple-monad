@@ -94,8 +94,9 @@ describe("Result.matchBad", () => {
     ).toThrow(ResultError);
   });
 
-  it("returns undefined for an Ok", () => {
-    expect(Result.matchBad(ok(), {})).toBeUndefined();
+  it("requires a Bad; an Ok is rejected at compile time", () => {
+    // @ts-expect-error matchBad requires a Bad — an Ok is not assignable.
+    expect(() => Result.matchBad(ok(), {})).toThrow(ResultError);
   });
 });
 

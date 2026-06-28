@@ -11,6 +11,7 @@ imports from the package exactly as a consumer would (`import { ok, bad } from
 | [`03-wrap-throwing-api.ts`](./03-wrap-throwing-api.ts) | Simple leaves                      | Turn a throwing API (`JSON.parse`) into a `Result`.            |
 | [`04-domain-operation.ts`](./04-domain-operation.ts)   | `ok()` + `unwrap*` toolkit         | A bank withdrawal with business rules and a valueless success. |
 | [`05-result-chaining.ts`](./05-result-chaining.ts)     | `Result` wrapper (`map`/`match`)   | A parse → transform → fold pipeline.                           |
+| [`06-match-bad-map.ts`](./06-match-bad-map.ts)         | `Result` wrapper, per-tag `match`  | Fold a multi-failure checkout to a response, one handler per tag. |
 
 ## Running them
 

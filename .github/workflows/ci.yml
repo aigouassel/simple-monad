@@ -40,8 +40,16 @@ jobs:
       - name: Build
         run: yarn build
 
-      - name: Test
-        run: yarn test
+      # test:coverage (not plain `test`) so the 100% coverageThreshold in
+      # jest.config.cjs is enforced — `yarn test` alone never checks coverage.
+      - name: Test (with coverage)
+        run: yarn test:coverage
+
+      # Build dist and run every examples/*.ts. They are not part of any tsconfig,
+      # so executing them is the only guard against example drift; the `examples`
+      # script runs under `set -e`, so a single broken example fails the job.
+      - name: Examples
+        run: yarn examples
 
   deploy-docs:
     # Publish the TypeDoc API site to GitHub Pages — only on pushes to main

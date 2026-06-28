@@ -1,6 +1,6 @@
 {
   "name": "simple-monad",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "description": "A tiny, dependency-free Result (Ok/Bad) type for TypeScript with tag-based errors and unwrap/matchBad helpers.",
   "license": "MIT",
   "author": {
@@ -46,7 +46,7 @@
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "docs": "typedoc",
-    "examples": "yarn build && sh -c 'for f in examples/*.ts; do printf \"\\n# %s\\n\" \"$f\"; node \"$f\"; done'"
+    "examples": "yarn build && sh -c 'set -e; for f in examples/*.ts; do printf \"\\n# %s\\n\" \"$f\"; node \"$f\"; done'"
   },
   "publishConfig": {
     "access": "public"

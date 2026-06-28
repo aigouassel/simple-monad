@@ -49,14 +49,47 @@ type CallbackReturns<M> = {
 
 /**
  * The return type of {@link Result.matchBad} for result `T` and handler map `M`:
- * the union of the handlers' return types, plus `undefined` when `T` can be an
- * {@link Ok}.
+ * the union of the handlers' return types. `matchBad` requires `T` to be a
+ * {@link Bad}, so the result never includes `undefined` — an unhandled reason
+ * throws instead.
  *
- * @typeParam T - The result union being matched.
+ * @typeParam T - The {@link Bad} union being matched (kept for signature symmetry).
  * @typeParam M - The handler map passed to `matchBad`.
  */
-export type MatchBadResult<T, M> =
-  T extends Ok<unknown> ? CallbackReturns<M> | undefined : CallbackReturns<M>;
+export type MatchBadResult<T, M> = T extends unknown
+  ? CallbackReturns<M>
+  : never;
+
+/**
+ * The handler map {@link Result.match} expects. Each arm is required only when
+ * its rail is inhabited: a `never` success rail (`A`) drops the unreachable `ok`
+ * handler, and a `never` failure rail (`B`) drops the unreachable `bad` handler.
+ * Supplying a dropped handler is a compile error. The `bad` arm is a per-reason
+ * map identical to {@link Result.matchBad}'s — one callback per failure tag.
+ *
+ * @typeParam A - The success value type.
+ * @typeParam B - The failure (`Bad` union) type.
+ * @typeParam U - The `ok` handler's return type.
+ * @typeParam M - The `bad` per-reason handler map (see {@link MatchBadInput}).
+ */
+type MatchHandlers<A, B, U, M> = ([A] extends [never]
+  ? unknown
+  : { ok: (value: A) => U }) &
+  ([B] extends [never] ? unknown : { bad: M });
+
+/**
+ * The return type of {@link Result.match}: the union of whichever handlers exist.
+ * A `never` rail contributes `never` (i.e. nothing) to the union. The `bad` arm
+ * contributes the union of its per-reason callback return types.
+ *
+ * @typeParam A - The success value type.
+ * @typeParam B - The failure (`Bad` union) type.
+ * @typeParam U - The `ok` handler's return type.
+ * @typeParam M - The `bad` per-reason handler map.
+ */
+type MatchResult<A, B, U, M> =
+  | ([A] extends [never] ? never : U)
+  | ([B] extends [never] ? never : CallbackReturns<M>);
 
 /**
  * An opt-in wrapper around an {@link Ok} / {@link Bad} leaf that adds chaining
@@ -88,16 +121,6 @@ export class Result<A, B extends Bad<ReasonType, unknown> = never> {
 
   private constructor(private readonly res: OkOrBad<A, B>) {}
 
-  /** Type guard narrowing the failure rail to `never` when this is a success. */
-  isOk(): this is Result<A, never> {
-    return this.res.isOk();
-  }
-
-  /** Type guard narrowing the success rail to `never` when this is a failure. */
-  isBad(): this is Result<never, B> {
-    return this.res.isBad();
-  }
-
   /**
    * Drop back to the underlying `Ok<A> | B` leaf union — the inverse of
    * {@link Result.from}. Narrow it with the leaf guards or feed it to the static
@@ -126,20 +149,31 @@ export class Result<A, B extends Bad<ReasonType, unknown> = never> {
   }
 
   /**
-   * Collapse to a single value by handling both arms.
+   * Collapse to a single value by handling both arms. Each handler is required
+   * only when its rail is inhabited: an all-success `Result<A, never>` takes just
+   * `{ ok }` (and rejects a dead `bad`), an all-failure `Result<never, B>` takes
+   * just `{ bad }`.
+   *
+   * The `bad` arm is a per-reason map identical to {@link Result.matchBad} — one
+   * callback per failure tag, each receiving the {@link Bad} carrying that tag —
+   * so failures refine on their `reason` without a manual `switch`.
    *
    * @typeParam U - The success handler's return type.
-   * @typeParam T - The failure handler's return type.
-   * @param handlers - `ok` receives the value; `bad` receives the whole
-   * {@link Bad} union, so it can narrow on `reason` and read `value`.
+   * @typeParam M - The `bad` per-reason handler map (see {@link MatchBadInput}).
+   * @param handlers - `ok` receives the value; `bad` maps each reason tag to a
+   * handler for the matching {@link Bad}.
    * @returns Whatever the chosen handler returns.
    */
-  match<U, T>(handlers: { ok: (value: A) => U; bad: (bad: B) => T }): U | T {
+  match<U, M extends MatchBadInput<B>>(
+    handlers: MatchHandlers<A, B, U, M>,
+  ): MatchResult<A, B, U, M> {
     if (this.res.isOk()) {
-      return handlers.ok(this.res.value);
+      const okHandler = (handlers as { ok: (value: A) => U }).ok;
+      return okHandler(this.res.value) as MatchResult<A, B, U, M>;
     }
-    // The bad handler receives the whole Bad union, so it can narrow on reason and read value.
-    return handlers.bad(this.res);
+    // Delegate failures to matchBad: this.res is now the Bad union B.
+    const badMap = (handlers as { bad: M }).bad;
+    return Result.matchBad(this.res, badMap) as MatchResult<A, B, U, M>;
   }
 
   // ===== Static toolkit: operates directly on bare Ok/Bad leaves (no wrapping). =====
@@ -223,37 +257,39 @@ export class Result<A, B extends Bad<ReasonType, unknown> = never> {
 
   /**
    * Dispatch on a failure's reason tag, like a `switch` over the {@link Bad}
-   * variants.
+   * variants. The input must be a {@link Bad} (or a union of them): narrow away
+   * any {@link Ok} first, with a leaf guard or an earlier return. Passing a value
+   * that could still be an `Ok` is a compile error at the call site, rather than a
+   * `| undefined` that leaks into the result.
    *
-   * @typeParam T - The result type being matched.
+   * @typeParam T - The {@link Bad} (or `Bad` union) being matched.
    * @typeParam M - The handler map (see {@link MatchBadInput}).
-   * @param result - The result to match.
+   * @param failure - The failure to match — already narrowed to a {@link Bad}.
    * @param map - One handler per reason tag; each receives the matching {@link Bad}.
-   * @returns The chosen handler's return value, or `undefined` for an {@link Ok}.
+   * @returns The chosen handler's return value.
    * @throws {@link ResultError} if the failure's reason has no handler.
    * @example
    * ```ts
-   * Result.matchBad(parse(input), {
+   * const r = parse(input);
+   * if (r.isOk()) return r.value;
+   * // r is now a Bad union
+   * Result.matchBad(r, {
    *   nan: (b) => `not a number: ${b.value}`,
    * });
    * ```
    */
-  static matchBad<T extends AnyResult, M extends MatchBadInput<T>>(
-    result: T,
-    map: M,
-  ): MatchBadResult<T, M> {
-    if (!result.success) {
-      const failure = result as unknown as Bad<ReasonType, unknown>;
-      const handlers = map as Record<
-        string,
-        ((result: Bad<ReasonType, unknown>) => unknown) | undefined
-      >;
-      const entry = handlers[failure.reason];
-      if (!entry) {
-        throwResultError(failure);
-      }
-      return entry(failure) as MatchBadResult<T, M>;
+  static matchBad<
+    T extends Bad<ReasonType, unknown>,
+    M extends MatchBadInput<T>,
+  >(failure: T, map: M): MatchBadResult<T, M> {
+    const handlers = map as Record<
+      string,
+      ((result: Bad<ReasonType, unknown>) => unknown) | undefined
+    >;
+    const entry = handlers[failure.reason];
+    if (!entry) {
+      throwResultError(failure);
     }
-    return undefined as MatchBadResult<T, M>;
+    return entry(failure) as MatchBadResult<T, M>;
   }
 }

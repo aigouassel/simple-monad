@@ -1,13 +1,13 @@
 # simple-monad
 
-![version](https://img.shields.io/badge/version-2.0.0-blue)
+![version](https://img.shields.io/badge/version-3.0.0-blue)
 
 A tiny, dependency-free `Result` type for TypeScript — a value that is either
 `Ok` (success) or `Bad` (failure), so errors live in the type system instead of
 in thrown exceptions.
 
 ```sh
-npm install simple-monad@2.0.0
+npm install simple-monad@3.0.0
 ```
 
 A failure is a string **tag** (`reason`) plus an optional **payload** (`value`):
@@ -69,16 +69,20 @@ function checkout(book: Book) {
 
 ### Static toolkit — `matchBad` / `unwrap`
 
-`matchBad` dispatches on the tag (and throws `ResultError` if a tag is unhandled);
-`unwrap` pulls the success value out or throws on a failure:
+`matchBad` requires a `Bad` (narrow away the `Ok` first), then dispatches on the tag
+(and throws `ResultError` if a tag is unhandled); `unwrap` pulls the success value out
+or throws on a failure:
 
 ```ts
 import { Result } from "simple-monad";
 
-const message = Result.matchBad(checkout(book), {
-  book_not_found: (b) => `no such book: ${b.value.isbn}`, // b.value: { isbn: string }
-  invalid_price: (b) => `bad price: ${b.value.price}`, // b.value: { price: number }
-});
+const result = checkout(book);
+const message = result.isOk()
+  ? `price: ${result.value}`
+  : Result.matchBad(result, {
+      book_not_found: (b) => `no such book: ${b.value.isbn}`, // b.value: { isbn: string }
+      invalid_price: (b) => `bad price: ${b.value.price}`, // b.value: { price: number }
+    });
 
 const port = Result.unwrap(parsePort("8080")); // number — or throws ResultError on a Bad
 ```
@@ -94,9 +98,18 @@ const label = Result.from(parsePort("8080"))
   .map((p) => p * 2) // transform the success value; a failure passes through
   .match({
     ok: (p) => `port ${p}`, // p: number
-    bad: (b) => `error: ${b.reason}`, // b: the whole Bad — read .reason / .value
+    // `bad` is a per-reason map (same shape as `matchBad`), one handler per tag
+    bad: { invalid_port: (b) => `error: ${b.reason}` }, // b: Bad<"invalid_port", string>
   });
 ```
+
+`match` requires only the arms a result can produce: an all-success `Result<A, never>`
+takes just `{ ok }` (and rejects a dead `bad`), an all-failure `Result<never, B>` takes
+just `{ bad }`.
+
+The wrapper is for chaining, not narrowing — it has no `isOk()` / `isBad()` guards.
+To narrow, use `.match(...)`, or drop back to the leaf with `.toUnion()` and use the
+leaf guards (`if (leaf.isOk()) …`), which narrow the value on both branches.
 
 ## Compatibility
 
@@ -143,9 +156,8 @@ Constructed only via `Result.from(...)` (the constructor is private).
 | ---------------------- | ---------------------------------------------------------------------------- |
 | `Result.from(res)`     | Lift an `Ok` / `Bad` / `OkOrBad` into a `Result` for chaining.               |
 | `.map(f)`              | Transform the success value; a failure passes through unchanged.             |
-| `.match({ ok, bad })`  | Collapse to a single value; `bad` receives the whole `Bad` (read tag/value). |
+| `.match({ ok, bad })`  | Collapse to a single value; `bad` is a per-reason map (like `matchBad`). Each arm is required only when its rail is inhabited. |
 | `.toUnion()`           | Drop back to the `Ok \| Bad` leaf union — the inverse of `Result.from`.      |
-| `.isOk()` / `.isBad()` | Narrow the _opposite_ rail to `never` (`isOk()` ⇒ failure type is `never`).  |
 
 ### `Result` static toolkit
 
@@ -158,7 +170,7 @@ These operate on bare leaves and **throw `ResultError`** when handed the wrong v
 | `Result.unwrapBad(r)`              | The `Bad` leaf — throws on an `Ok`.                                |
 | `Result.unwrapBadReason(r)`        | The `Bad`'s tag — throws on an `Ok`.                               |
 | `Result.unwrapBadValue(r)`         | The `Bad`'s payload — throws on an `Ok`.                           |
-| `Result.matchBad(r, map)`          | Dispatch on the tag; throws if unhandled; `undefined` for an `Ok`. |
+| `Result.matchBad(r, map)`          | Requires a `Bad` (narrow first); dispatch on the tag; throws if unhandled. |
 | `ResultError` / `throwResultError` | The error thrown by the helpers above, and its thrower.            |
 
 ## Development

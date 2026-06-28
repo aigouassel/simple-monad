@@ -28,15 +28,14 @@ function validateSignup(input: Signup): OkOrBad<Signup, SignupError> {
 
 function describe(input: Signup): string {
   const result = validateSignup(input);
-  // matchBad returns `undefined` when the result is an Ok, so fall back to a
-  // success message with `??`.
-  return (
-    Result.matchBad(result, {
-      missing_email: () => "email must contain @",
-      weak_password: (b) => `password needs ${b.value.minLength}+ chars`,
-      underage: (b) => `must be ${b.value.required}, got ${b.value.age}`,
-    }) ?? "✓ signup accepted"
-  );
+  // matchBad requires a Bad, so handle the success first — the early return also
+  // narrows `result` to the SignupError union for the call below.
+  if (result.isOk()) return "✓ signup accepted";
+  return Result.matchBad(result, {
+    missing_email: () => "email must contain @",
+    weak_password: (b) => `password needs ${b.value.minLength}+ chars`,
+    underage: (b) => `must be ${b.value.required}, got ${b.value.age}`,
+  });
 }
 
 const okInput = { email: "a@b.co", password: "longenough", age: 30 };

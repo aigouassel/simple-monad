@@ -21,7 +21,9 @@ function formatPrice(raw: string): string {
     .map((cents) => `$${(cents / 100).toFixed(2)}`)
     .match({
       ok: (label) => label, // "$42.00"
-      bad: (b) => `not a price: ${b.value}`, // the failure flowed through both maps
+      // `bad` is a per-reason map (same shape as Result.matchBad) — the failure
+      // flowed through both maps untouched and lands here by its tag.
+      bad: { not_a_number: (b) => `not a price: ${b.value}` },
     });
 }
 
