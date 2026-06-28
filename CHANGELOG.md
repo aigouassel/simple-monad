@@ -4,6 +4,19 @@ All notable changes to this project are documented here. This project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [3.1.1] - 2026-06-28
+
+Docs-only republish. The 3.1.0 tarball shipped a README that still showed the 3.0.0
+version badge and `npm install simple-monad@3.0.0`. Because npm bakes the README into
+the published tarball per version and serves the *latest* version's copy, the stale
+text could only be corrected by publishing a new version. No code, API, or type
+changes — 3.1.0 and 3.1.1 are byte-identical except for the README and this entry.
+
+### Fixed
+
+- Corrected the version badge and install command in the README to match the published
+  version.
+
 ## [3.1.0] - 2026-06-28
 
 This release makes the package consumable from **CommonJS runtimes** without changing

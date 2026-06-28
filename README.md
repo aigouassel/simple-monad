@@ -1,13 +1,13 @@
 # simple-monad
 
-![version](https://img.shields.io/badge/version-3.1.0-blue)
+![version](https://img.shields.io/badge/version-3.1.1-blue)
 
 A tiny, dependency-free `Result` type for TypeScript — a value that is either
 `Ok` (success) or `Bad` (failure), so errors live in the type system instead of
 in thrown exceptions.
 
 ```sh
-npm install simple-monad@3.1.0
+npm install simple-monad@3.1.1
 ```
 
 A failure is a string **tag** (`reason`) plus an optional **payload** (`value`):
